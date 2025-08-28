@@ -6,11 +6,6 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-if [ "$2" -le 0 ]; then
-    echo "Error: la cantidad de clientes debe ser un numero positivo."
-    exit 1
-fi
-
 echo "Nombre del archivo de salida: $1"
 echo "Cantidad de clientes: $2"
 
