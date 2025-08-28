@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NETWORK="testing_net"
+NETWORK="tp0_testing_net"
 SERVER_IP="SERVER"
 SERVER_PORT=12345
 MESSAGE="MESSAGE"
