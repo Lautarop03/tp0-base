@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
@@ -100,6 +102,10 @@ func main() {
 		log.Criticalf("%s", err)
 	}
 
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM)
+	done := make(chan bool, 1)
+
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
@@ -111,5 +117,13 @@ func main() {
 	}
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+	go client.StartClientLoop()
+
+	go func() {
+		<-sigs
+		client.Stop()
+		done <- true
+	}()
+
+	<-done
 }
