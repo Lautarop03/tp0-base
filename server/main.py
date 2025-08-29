@@ -4,6 +4,8 @@ from configparser import ConfigParser
 from common.server import Server
 import logging
 import os
+import signal
+import sys
 
 
 def initialize_config():
@@ -42,6 +44,7 @@ def main():
 
     initialize_log(logging_level)
 
+
     # Log config parameters at the beginning of the program to verify the configuration
     # of the component
     logging.debug(f"action: config | result: success | port: {port} | "
@@ -49,6 +52,10 @@ def main():
 
     # Initialize server and start server loop
     server = Server(port, listen_backlog)
+
+    # Use a closure to handle SIGTERM and gracefully stop this server instance
+    signal.signal(signal.SIGTERM, make_graceful_shutdown(server))
+
     server.run()
 
 def initialize_log(logging_level):
@@ -63,7 +70,11 @@ def initialize_log(logging_level):
         level=logging_level,
         datefmt='%Y-%m-%d %H:%M:%S',
     )
-
+def make_graceful_shutdown(server):
+    def graceful_shutdown(signum, frame):
+        server.stop()
+        sys.exit(0)
+    return graceful_shutdown
 
 if __name__ == "__main__":
     main()
