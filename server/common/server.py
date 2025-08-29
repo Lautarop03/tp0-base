@@ -1,7 +1,7 @@
 import socket
 import logging
 from .utils import store_bets
-from .protocol import read_bet_msg
+from .protocol import read_bet_msg, send_bet_confirmation
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -35,11 +35,11 @@ class Server:
         """
         try:
             bet = read_bet_msg(client_sock)
+            
             store_bets([bet])
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format("apuesta_almacenada").encode('utf-8')) # TODO: Mantener la respuesta echo como confirmacion
+            send_bet_confirmation(client_sock, bet)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:

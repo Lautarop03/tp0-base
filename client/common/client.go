@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bufio"
 	"net"
 	"os"
 	"time"
@@ -66,7 +65,6 @@ func (c *Client) StartClientLoop() {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 
-		// TENGO QUE CARGAR LOS DATOS DE ENV
 		clientBet := ClientBet{
 			Nombre:     os.Getenv("NOMBRE"),
 			Apellido:   os.Getenv("APELLIDO"),
@@ -85,8 +83,7 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		// TODO: RECIBIR LA CONFIRMACION (TODO A TRAVES DEL PROTOCOLO CON LA SER/DES SERIALIZACION ETC)
-		_, err = bufio.NewReader(c.conn).ReadString('\n') // TODO: Recibir con el protocolo (tener en cuenta short-read), deberia recibir los datos del server?
+		confirmationBet, err := receiveConfirmationMsg(c.conn)
 		c.conn.Close()
 
 		if err != nil {
@@ -98,8 +95,8 @@ func (c *Client) StartClientLoop() {
 		}
 
 		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
-			clientBet.Documento,
-			clientBet.Numero,
+			confirmationBet.Documento,
+			confirmationBet.Numero,
 		)
 
 		// Wait a time between sending one message and the next one
