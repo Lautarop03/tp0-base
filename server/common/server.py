@@ -1,7 +1,7 @@
 import socket
-import struct
 import logging
-from .utils import Bet, store_bets
+from .utils import store_bets
+from .protocol import read_bet_msg
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -34,12 +34,12 @@ class Server:
         client socket will also be closed
         """
         try:
-            bet = recibir_bet_msg(client_sock)
+            bet = read_bet_msg(client_sock)
             store_bets([bet])
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
             # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format("apuesta_almacenada").encode('utf-8')) # TODO: ver que devolver
+            client_sock.send("{}\n".format("apuesta_almacenada").encode('utf-8')) # TODO: Mantener la respuesta echo como confirmacion
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
@@ -67,38 +67,3 @@ class Server:
         if self._client_socket:
             self._client_socket.close()
             logging.info("action: stop | result: success | detail: client socket was closed")
-
-def recv_exact(sock: socket.socket, n: int) -> bytes:
-    """Lee exactamente n bytes del socket"""
-    buf = b''
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("Conexión cerrada antes de recibir todos los bytes")
-        buf += chunk
-    return buf
-
-
-def recibir_bet_msg(client_sock: socket.socket) -> Bet:
-    def read_string():
-        # Leer 2 bytes de longitud
-        len_bytes = recv_exact(client_sock, 2)
-        length = struct.unpack('>H', len_bytes)[0]  # uint16 big-endian
-        # Leer los bytes del string
-        string_bytes = recv_exact(client_sock, length)
-        return string_bytes.decode('utf-8')
-
-    client_id = read_string()
-    nombre = read_string()
-    apellido = read_string()
-    documento = read_string()
-    nacimiento = read_string()
-    numero = read_string()
-
-    return Bet(
-        agency= client_id, 
-        first_name= nombre,
-        last_name= apellido,
-        document= documento,
-        birthdate= nacimiento,
-        number= numero )
