@@ -39,7 +39,7 @@ class Server:
             logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
 
             # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(bet).encode('utf-8')) # ENVIAR LA DATA
+            client_sock.send("{}\n".format("apuesta_almacenada").encode('utf-8')) # TODO: ver que devolver
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
@@ -88,6 +88,7 @@ def recibir_bet_msg(client_sock: socket.socket) -> Bet:
         string_bytes = recv_exact(client_sock, length)
         return string_bytes.decode('utf-8')
 
+    client_id = read_string()
     nombre = read_string()
     apellido = read_string()
     documento = read_string()
@@ -95,7 +96,7 @@ def recibir_bet_msg(client_sock: socket.socket) -> Bet:
     numero = read_string()
 
     return Bet(
-        agency=1, #TODO: Que usar aca?
+        agency= client_id, 
         first_name= nombre,
         last_name= apellido,
         document= documento,
