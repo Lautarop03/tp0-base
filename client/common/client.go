@@ -78,7 +78,7 @@ func (c *Client) StartClientLoop() {
 		}
 
 		// SERIALIZAR EL MSG CON EL PROTOCOLO
-		msg, err := serializar_msg(&clientBet)
+		msg, err := serializar_msg(&clientBet, c.config.ID)
 
 		if err != nil {
 			log.Errorf("action: serialize_msg | result: fail | client_id: %v | error: %v",
@@ -97,13 +97,9 @@ func (c *Client) StartClientLoop() {
 			)
 			return
 		}
-		log.Infof("action: send_msg | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
 
 		// TODO: RECIBIR LA CONFIRMACION (TODO A TRAVES DEL PROTOCOLO CON LA SER/DES SERIALIZACION ETC)
-		recvMsg, err := bufio.NewReader(c.conn).ReadString('\n') // TODO:Recibir con el protocolo
+		_, err = bufio.NewReader(c.conn).ReadString('\n') // TODO: Recibir con el protocolo (tener en cuenta short-read), deberia recibir los datos del server?
 		c.conn.Close()
 
 		if err != nil {
@@ -114,9 +110,9 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			recvMsg,
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+			clientBet.Documento,
+			clientBet.Numero,
 		)
 
 		// Wait a time between sending one message and the next one
@@ -126,7 +122,7 @@ func (c *Client) StartClientLoop() {
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
 
-func serializar_msg(c *ClientBet) ([]byte, error) {
+func serializar_msg(c *ClientBet, clientId string) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// Helper para strings
@@ -141,6 +137,9 @@ func serializar_msg(c *ClientBet) ([]byte, error) {
 	}
 
 	// Serializar campos
+	if err := writeString(clientId); err != nil {
+		return nil, err
+	}
 	if err := writeString(c.Nombre); err != nil {
 		return nil, err
 	}
