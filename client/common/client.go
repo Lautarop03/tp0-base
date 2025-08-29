@@ -2,8 +2,6 @@ package common
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/binary"
 	"net"
 	"os"
 	"time"
@@ -77,19 +75,8 @@ func (c *Client) StartClientLoop() {
 			Numero:     os.Getenv("NUMERO"),
 		}
 
-		// SERIALIZAR EL MSG CON EL PROTOCOLO
-		msg, err := serializar_msg(&clientBet, c.config.ID)
+		err := sendMsg(c.conn, &clientBet, c.config.ID)
 
-		if err != nil {
-			log.Errorf("action: serialize_msg | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		// ENVIAR EL MSG (ESTO Y LO DE ARRIBA SE ENCARGA EL PROTOCOLO, YO COMO CLIENTE NO SE NADA)
-		err = sendMsg(c.conn, msg)
 		if err != nil {
 			log.Errorf("action: send_msg | result: fail | client_id: %v | error: %v",
 				c.config.ID,
@@ -120,56 +107,6 @@ func (c *Client) StartClientLoop() {
 
 	}
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-}
-
-func serializar_msg(c *ClientBet, clientId string) ([]byte, error) {
-	buf := new(bytes.Buffer)
-
-	// Helper para strings
-	writeString := func(s string) error {
-		if err := binary.Write(buf, binary.BigEndian, uint16(len(s))); err != nil {
-			return err
-		}
-		if _, err := buf.Write([]byte(s)); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	// Serializar campos
-	if err := writeString(clientId); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Nombre); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Apellido); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Documento); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Nacimiento); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Numero); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-// Para evitar el short-write y asegurar el envio de todo el mensaje
-func sendMsg(conn net.Conn, data []byte) error {
-	total := 0
-	for total < len(data) {
-		n, err := conn.Write(data[total:])
-		if err != nil {
-			return err
-		}
-		total += n
-	}
-	return nil
 }
 
 func (c *Client) Stop() {
