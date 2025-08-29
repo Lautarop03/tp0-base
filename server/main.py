@@ -58,6 +58,7 @@ def main():
 
     server.run()
 
+
 def initialize_log(logging_level):
     """
     Python custom logging initialization
@@ -70,11 +71,14 @@ def initialize_log(logging_level):
         level=logging_level,
         datefmt='%Y-%m-%d %H:%M:%S',
     )
+
+
 def make_graceful_shutdown(server):
     def graceful_shutdown(signum, frame):
         server.stop()
         sys.exit(0)
     return graceful_shutdown
+
 
 if __name__ == "__main__":
     main()
