@@ -30,6 +30,11 @@ for i in $(seq 1 $2); do
     entrypoint: /client
     environment:
       - CLI_ID=$i
+      - NOMBRE=Santiago
+      - APELLIDO=Lorca
+      - DOCUMENTO=30904465
+      - NACIMIENTO=1999-03-17
+      - NUMERO=7574
     volumes:
       - ./client/config.yaml:/config.yaml
     networks:
