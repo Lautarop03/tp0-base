@@ -178,3 +178,123 @@ Se espera que se redacte una sección del README en donde se indique cómo ejecu
 Se proveen [pruebas automáticas](https://github.com/7574-sistemas-distribuidos/tp0-tests) de caja negra. Se exige que la resolución de los ejercicios pase tales pruebas, o en su defecto que las discrepancias sean justificadas y discutidas con los docentes antes del día de la entrega. El incumplimiento de las pruebas es condición de desaprobación, pero su cumplimiento no es suficiente para la aprobación. Respetar las entradas de log planteadas en los ejercicios, pues son las que se chequean en cada uno de los tests.
 
 La corrección personal tendrá en cuenta la calidad del código entregado y casos de error posibles, se manifiesten o no durante la ejecución del trabajo práctico. Se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección informados  [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
+
+## Decisiones de diseño
+### Ej1
+Se realizo un script de bash `generar-compose.sh`, decidi hacerlo en Bash sin apoyarme en python.
+Al tratarse de un compose simple, esta solucion es suficiente. En otros escenarios mas complejos optaria por Python siendo este mas conveniente.
+
+### Ej2
+En docker compose se agrega un volumen para cada contenedor, tanto del cliente como del servidor. El volumen se define de la siguiente forma:
+``` 
+volumes:
+    - ./server/config.ini:/config.ini
+```
+Con esta configuracion, el archivo `config` en el directorio host se monta dentro del contenedor en la ruta `/config`
+
+### Ej3
+En el script `validar-echo-server` se usa la imagen `busybox` que contiene `netcat` para conectarse al servidor y comprobar el correcto funcionamiento del mismo.
+```
+docker run --rm --network $NETWORK busybox sh -c "echo $MESSAGE | nc -w 3 $SERVER_IP $SERVER_PORT"
+```
+Flags:
+`--rm` hace que sea un contenedor temporal y se elimine al finalizar la ejecucion.
+
+`--network $NETWORK` conecta el contenedor a la red interna de docker donde se encuentra el server.
+
+`busybox sh -c "..."` ejecuta un shell dentro de la imagen `busybox`
+
+### Ej4
+El flag `-t` en `docker compose down` define cuantos segundos docker espera a que el contenedor se detenga de forma gracegul despues de enviarle la señal `SIGTERM`
+
+En el server se agrego un handler que recibe la señal `SIGTERM` y asi detener de forma graceful.
+```
+signal.signal(signal.SIGTERM, make_graceful_shutdown(server))
+```
+Cuando se reciba la señal, se ejecuta la funcion `make_graceful_shutdown(server)` esta es una clousure para poder tener referencia al server, devuelve otra funcion que, al ejecutarse, llama a `server.stop()` y esta ultima se encarga de cerrar los sockets del servidor y cliente.
+
+En el cliente se agrega un canal de tamaño 1 para recibir señales
+```
+sigs := make(chan os.Signal, 1)
+signal.Notify(sigs, syscall.SIGTERM)
+done := make(chan bool, 1)
+```
+Las señales `SIGTERM` se enviaran por el canal sigs
+
+Luego se lanza una goroutine que se queda esperando por la señal en sigs
+```
+go func() {
+    <-sigs
+    client.Stop()
+    done <- true
+}()
+```
+Se llama a `client.stop()` que cierra los sockets correspondientes y luego se envia `true` por el canal `done` para avisar al main que puede finalizar.
+
+### Ej5
+
+#### Confirmación de apuestas
+
+Despues de recibir y guardar una apuesta, el servidor sigue funcionando como un echo server para confirmar la recepcion.
+
+El servidor envía de vuelta la misma apuesta que recibio.
+
+Esto permite al cliente verificar que todos los campos se recibieron correctamente.
+
+#### Definicion del protocolo
+
+Cada mensaje se compone de varios campos de tipo string, correspondientes a una apuesta.
+
+Para cada campo se sigue el formato:
+
+`[longitud: 2 bytes uint16 big-endian]` `[string en UTF-8]`
+
+
+Los 2 bytes iniciales indican la longitud exacta del string que sigue.
+
+
+Campos transmitidos en orden:
+
+`client_id (ID del cliente o agencia)`
+
+`first_name (nombre)`
+
+`last_name (apellido)`
+
+`document (documento)`
+
+`birthdate (fecha de nacimiento)`
+
+`number (numero de apuesta)`
+
+#### Uso correcto de sockets
+
+*Short-read server:*
+```
+def read_exact(sock, n):
+    buf = b''
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("Connection closed before receiving all bytes")
+        buf += chunk
+    return buf
+```
+Esta función asegura que se lean exactamente los bytes esperados.
+
+*Short-write server:*
+
+`sendall()` asegura que todos los bytes del mensaje se envíen al socket.
+
+*Short-write client:*
+```
+total := 0
+for total < len(data) {
+	n, err := conn.Write(data[total:])
+	if err != nil {
+		return err
+	}
+	total += n
+}
+return nil
+```
