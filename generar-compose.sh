@@ -37,6 +37,7 @@ for i in $(seq 1 $2); do
       - NUMERO=7574
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data/dataset/agency-$i.csv:/agency-$i.csv
     networks:
       - testing_net
     depends_on:
