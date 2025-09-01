@@ -106,7 +106,7 @@ func main() {
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
-	done := make(chan bool, 1)
+	done := make(chan struct{})
 
 	// Print program config with debugging purposes
 	PrintConfig(v)
@@ -120,13 +120,14 @@ func main() {
 	}
 
 	client := common.NewClient(clientConfig)
-	go client.StartClientLoop()
-
 	go func() {
-		<-sigs
-		client.Stop()
-		done <- true
+		client.StartClientLoop()
+		close(done)
 	}()
 
-	<-done
+	select {
+	case <-sigs:
+		client.Stop()
+	case <-done:
+	}
 }
