@@ -62,7 +62,9 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
+// StartClientLoop reads all betting records from the CSV file and sends them in batches to the server.
+// For each batch, it waits for a confirmation before proceeding to the next batch.
+// The loop finishes when all records have been sent or an error occurs.
 func (c *Client) StartClientLoop() {
 	// Open the CSV file
 	file, err := os.Open("/agency.csv")
@@ -79,10 +81,7 @@ func (c *Client) StartClientLoop() {
 
 	c.createClientSocket()
 
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-
+	for {
 		batch := c.createBatch(reader)
 		if len(batch) == 0 {
 			break
@@ -119,9 +118,7 @@ func (c *Client) StartClientLoop() {
 
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
-
 	}
-
 	c.conn.Close()
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
