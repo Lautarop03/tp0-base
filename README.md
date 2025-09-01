@@ -298,3 +298,25 @@ for total < len(data) {
 }
 return nil
 ```
+
+### Ej6
+Se monta el archivo de data para cada cliente segun su id.
+```
+./.data/agency-&1.csv:/agency.csv
+```
+De esta manera tenemos que todos los clientes independietemente de su id, utilizan dentro de su contenedor el nombre de archivo `/agency.csv`.
+
+#### Protocolo de batch
+Como cliente se lee el archivo csv con `"encoding/csv"`, se llena el batch con apuestas hasta llegar al limite de 8kB (constante configurable dentro del archivo client.go) o `batch.maxAmount:` (en `config.yaml`).
+Por cada batch se serializa y envia el mismo de la siguiente manera:
+
+`[cantidad de apuestas enviadas en el batch: 2 bytes uint16 big-endian]`
+
+Luego, todas las apuestas se envian seguidas, sin delimitadores. El servidor solo necesita saber cuantas apuestas recibir para procesarlas y guardarlas.
+
+### Otras modificaciones
+* Se elimino la reconexion luego de cada mensaje
+* El servidor escucha una unica conexion hasta que el cliente la cierra, se modifico para este ejercicio y asi un cliente envia todas las apuestas mediante batchs y no necesita reconectarse. El cliente al finalizar cierra el socket y el servidor queda disponible escuchando nuevas conexiones.
+- **Modificacion de diseño de protocolo**: 
+Se realizo una actualizacion en el protocolo con respecto a los tamaños de los indicadores de longitud de los strings.
+Ahora son `uint8`, en base a los csv recibidos me parece una buena opcion tener hasta un largo de 255 bytes. Esto tambien permite el envio de mayores apuestas dentro del batch.
