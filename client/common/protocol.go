@@ -78,21 +78,6 @@ func sendBatch(conn net.Conn, batch []ClientBet, clientID string) error {
 	return nil
 }
 
-// Helper to read a string with a uint16 big-endian prefix
-func readString(conn net.Conn) (string, error) {
-	lenBytes := make([]byte, 2)
-	if _, err := io.ReadFull(conn, lenBytes); err != nil {
-		return "", err
-	}
-	length := binary.BigEndian.Uint16(lenBytes)
-
-	strBytes := make([]byte, length)
-	if _, err := io.ReadFull(conn, strBytes); err != nil {
-		return "", err
-	}
-	return string(strBytes), nil
-}
-
 // receiveBatchConfirmation receives the batch confirmation from the server.
 // Format:
 //
