@@ -47,7 +47,7 @@ class Server:
                 logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
                 send_batch_confirmation(client_sock, True, "Apuestas recibidas correctamente")
         except OSError as e:
-            logging.error(f"action: waiting_new_batch | detail: {e}")
+            #logging.error(f"action: waiting_new_batch | detail: {e}")
             send_batch_confirmation(client_sock, False, "Error al recibir las apuestas")
         finally:
             client_sock.close()
