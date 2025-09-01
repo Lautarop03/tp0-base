@@ -1,7 +1,7 @@
 import socket
 import logging
 from .utils import store_bets
-from .protocol import read_bet_msg, send_bet_confirmation
+from .protocol import read_batch_msg, send_batch_confirmation
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -34,14 +34,17 @@ class Server:
         client socket will also be closed
         """
         try:
-            bet = read_bet_msg(client_sock)
+            bets = read_batch_msg(client_sock)
             
-            store_bets([bet])
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}')
+            store_bets(bets)
+            logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
 
-            send_bet_confirmation(client_sock, bet)
+            send_batch_confirmation(client_sock, True, "Apuestas recibidas correctamente")
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: receive_message | result: fail | error: {e}")
+            
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: ${len(bets)}")
+            send_batch_confirmation(client_sock, False, "Error al recibir las apuestas")
         finally:
             client_sock.close()
 
