@@ -35,6 +35,10 @@ class Server:
         """
         try:
             bets = read_batch_msg(client_sock)
+            if len(bets) == 0:
+                logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
+                send_batch_confirmation(client_sock, False, "No se recibieron apuestas")
+                return
             
             store_bets(bets)
             logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')

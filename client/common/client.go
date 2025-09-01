@@ -84,6 +84,9 @@ func (c *Client) StartClientLoop() {
 		c.createClientSocket()
 
 		batch := c.createBatch(reader)
+		if len(batch) == 0 {
+			break
+		}
 
 		err = sendBatch(c.conn, batch, c.config.ID)
 
@@ -106,8 +109,12 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		log.Infof("action: apuesta_enviada | result: %t | message: %v",
-			confirmation.Success,
+		result := "fail"
+		if confirmation.Success {
+			result = "success"
+		}
+		log.Infof("action: apuesta_enviada | result: %s | message: %v",
+			result,
 			confirmation.Message,
 		)
 
