@@ -80,6 +80,7 @@ func (c *Client) StartClientLoop() {
 	reader := csv.NewReader(file)
 
 	c.createClientSocket()
+	defer c.conn.Close()
 
 	for {
 		batch := c.createBatch(reader)
@@ -119,7 +120,6 @@ func (c *Client) StartClientLoop() {
 		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 	}
-	c.conn.Close()
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
