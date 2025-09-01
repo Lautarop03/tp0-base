@@ -28,26 +28,26 @@ class Server:
 
     def __handle_client_connection(self, client_sock):
         """
-        Read message from a specific client socket and closes the socket
+        Read messages from a specific client socket until the connection is closed.
 
         If a problem arises in the communication with the client, the
-        client socket will also be closed
+        client socket will also be closed.
         """
         try:
-            bets = read_batch_msg(client_sock)
-            if len(bets) == 0:
-                logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
-                send_batch_confirmation(client_sock, False, "No se recibieron apuestas")
-                return
-            
-            store_bets(bets)
-            logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
+            while True:
+                bets = read_batch_msg(client_sock)
+                if bets is None:
+                    break
+                if len(bets) == 0:
+                    logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
+                    send_batch_confirmation(client_sock, False, "No se recibieron apuestas")
+                    continue
 
-            send_batch_confirmation(client_sock, True, "Apuestas recibidas correctamente")
+                store_bets(bets)
+                logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
+                send_batch_confirmation(client_sock, True, "Apuestas recibidas correctamente")
         except OSError as e:
-            logging.error(f"action: receive_message | result: fail | error: {e}")
-            
-            logging.error(f"action: apuesta_recibida | result: fail | cantidad: ${len(bets)}")
+            logging.error(f"action: waiting_new_batch | result: fail | error: {e}")
             send_batch_confirmation(client_sock, False, "Error al recibir las apuestas")
         finally:
             client_sock.close()

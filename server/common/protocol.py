@@ -9,7 +9,7 @@ def read_exact(sock: socket.socket, n: int) -> bytes:
     while len(buf) < n:
         chunk = sock.recv(n - len(buf))
         if not chunk:
-            raise ConnectionError("Connection closed before receiving all bytes")
+            raise ConnectionError("Connection closed")
         buf += chunk
     return buf
 
