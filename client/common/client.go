@@ -81,7 +81,7 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		confirmationBet, err := receiveConfirmationMsg(c.conn) // cambia el msg de exito para todo el batch ahora
+		confirmation, err := receiveBatchConfirmation(c.conn)
 		c.conn.Close()
 
 		if err != nil {
@@ -92,9 +92,9 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
-			confirmationBet.Documento,
-			confirmationBet.Numero,
+		log.Infof("action: apuesta_enviada | result: %t | message: %v",
+			confirmation.Success,
+			confirmation.Message,
 		)
 
 		// Wait a time between sending one message and the next one

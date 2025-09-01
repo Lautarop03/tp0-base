@@ -93,41 +93,35 @@ func readString(conn net.Conn) (string, error) {
 	return string(strBytes), nil
 }
 
-func receiveConfirmationMsg(conn net.Conn) (*ClientBet, error) {
-	firstName, err := readString(conn)
-	if err != nil {
+// receiveBatchConfirmation receives the batch confirmation from the server.
+// Format:
+//
+//	1 byte: success (0 = fail, 1 = success)
+//	2 bytes: message length (uint16 big-endian)
+//	N bytes: message (utf-8)
+type BatchConfirmation struct {
+	Success bool
+	Message string
+}
+
+func receiveBatchConfirmation(conn net.Conn) (*BatchConfirmation, error) {
+	header := make([]byte, 3)
+	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, err
 	}
 
-	lastName, err := readString(conn)
-	if err != nil {
+	success := header[0] == 1
+	msgLen := binary.BigEndian.Uint16(header[1:3])
+
+	msgBytes := make([]byte, msgLen)
+	if _, err := io.ReadFull(conn, msgBytes); err != nil {
 		return nil, err
 	}
 
-	document, err := readString(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	birthdate, err := readString(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	number, err := readString(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	bet := &ClientBet{
-		Nombre:     firstName,
-		Apellido:   lastName,
-		Documento:  document,
-		Nacimiento: birthdate,
-		Numero:     number,
-	}
-
-	return bet, nil
+	return &BatchConfirmation{
+		Success: success,
+		Message: string(msgBytes),
+	}, nil
 }
 
 func sizeBytes(clientBet *ClientBet) int {
