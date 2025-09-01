@@ -63,15 +63,28 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
+	// Open the CSV file
+	file, err := os.Open("/agency.csv")
+	if err != nil {
+		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+	defer file.Close() // Close the file when the function returns
+
+	reader := csv.NewReader(file)
+
 	// There is an autoincremental msgID to identify every message sent
 	// Messages if the message amount threshold has not been surpassed
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 
-		batch := c.createBatch()
+		batch := c.createBatch(reader)
 
-		err := sendBatch(c.conn, batch, c.config.ID)
+		err = sendBatch(c.conn, batch, c.config.ID)
 
 		if err != nil {
 			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
@@ -104,20 +117,7 @@ func (c *Client) StartClientLoop() {
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
 
-func (c *Client) createBatch() []ClientBet {
-	// Open the CSV file
-	file, err := os.Open("/agency.csv") // El file lo necesito abrir desde afuera asi mantengo el orden desde donde estoy con el reader
-	if err != nil {
-		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return nil
-	}
-	defer file.Close() // Close the file when the function returns
-
-	reader := csv.NewReader(file)
-
+func (c *Client) createBatch(reader *csv.Reader) []ClientBet {
 	batch := make([]ClientBet, 0, c.config.BatchMaxAmount)
 
 	batchSize := 0

@@ -1,8 +1,8 @@
 server:
   address: "server:12345"
 loop:
-  amount: 5
-  period: "150ms"
+  amount: 3
+  period: "50ms"
 log:
   level: "INFO"
 batch:
