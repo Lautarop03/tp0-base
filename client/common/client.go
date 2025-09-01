@@ -10,16 +10,17 @@ import (
 	"github.com/op/go-logging"
 )
 
+const batchMaxBytesSize = 8 * 1024 // 8 kB
+
 var log = logging.MustGetLogger("log")
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID                string
-	ServerAddress     string
-	LoopAmount        int
-	LoopPeriod        time.Duration
-	BatchMaxAmount    int
-	BatchMaxBytesSize int
+	ID             string
+	ServerAddress  string
+	LoopAmount     int
+	LoopPeriod     time.Duration
+	BatchMaxAmount int
 }
 
 // Client Entity that encapsulates how
@@ -146,7 +147,7 @@ func (c *Client) createBatch(reader *csv.Reader) []ClientBet {
 
 		batch = append(batch, clientBet)
 
-		if len(batch) >= c.config.BatchMaxAmount || batchSize >= c.config.BatchMaxBytesSize {
+		if len(batch) >= c.config.BatchMaxAmount || batchSize >= batchMaxBytesSize {
 			break
 		}
 	}
