@@ -1,6 +1,8 @@
 package common
 
 import (
+	"encoding/csv"
+	"io"
 	"net"
 	"os"
 	"time"
@@ -12,10 +14,12 @@ var log = logging.MustGetLogger("log")
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
+	ID                string
+	ServerAddress     string
+	LoopAmount        int
+	LoopPeriod        time.Duration
+	BatchMaxAmount    int
+	BatchMaxBytesSize int
 }
 
 // Client Entity that encapsulates how
@@ -65,25 +69,19 @@ func (c *Client) StartClientLoop() {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
 
-		clientBet := ClientBet{
-			Nombre:     os.Getenv("NOMBRE"),
-			Apellido:   os.Getenv("APELLIDO"),
-			Documento:  os.Getenv("DOCUMENTO"),
-			Nacimiento: os.Getenv("NACIMIENTO"),
-			Numero:     os.Getenv("NUMERO"),
-		}
+		batch := c.createBatch()
 
-		err := sendMsg(c.conn, &clientBet, c.config.ID)
+		err := sendBatch(c.conn, batch, c.config.ID)
 
 		if err != nil {
-			log.Errorf("action: send_msg | result: fail | client_id: %v | error: %v",
+			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
 			)
 			return
 		}
 
-		confirmationBet, err := receiveConfirmationMsg(c.conn)
+		confirmationBet, err := receiveConfirmationMsg(c.conn) // cambia el msg de exito para todo el batch ahora
 		c.conn.Close()
 
 		if err != nil {
@@ -104,6 +102,55 @@ func (c *Client) StartClientLoop() {
 
 	}
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+}
+
+func (c *Client) createBatch() []ClientBet {
+	// Open the CSV file
+	file, err := os.Open("/agency.csv") // El file lo necesito abrir desde afuera asi mantengo el orden desde donde estoy con el reader
+	if err != nil {
+		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return nil
+	}
+	defer file.Close() // Close the file when the function returns
+
+	reader := csv.NewReader(file)
+
+	batch := make([]ClientBet, 0, c.config.BatchMaxAmount)
+
+	batchSize := 0
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Errorf("action: read_record_csv | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+		}
+
+		clientBet := ClientBet{
+			Nombre:     record[0],
+			Apellido:   record[1],
+			Documento:  record[2],
+			Nacimiento: record[3],
+			Numero:     record[4],
+		}
+
+		batchSize += sizeBytes(&clientBet)
+
+		batch = append(batch, clientBet)
+
+		if len(batch) >= c.config.BatchMaxAmount || batchSize >= c.config.BatchMaxBytesSize {
+			break
+		}
+	}
+	return batch
 }
 
 func (c *Client) Stop() {

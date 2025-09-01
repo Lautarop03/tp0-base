@@ -7,3 +7,4 @@ log:
   level: "INFO"
 batch:
   maxAmount: 10
+  maxBytesSize: 8192

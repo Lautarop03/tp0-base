@@ -7,12 +7,14 @@ import (
 	"net"
 )
 
-func serializar_msg(c *ClientBet, clientId string) ([]byte, error) {
+const stringLenOverhead = 1 // Overhead for string length prefix
+
+func serializeBet(c *ClientBet, clientId string) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// Helper for strings
 	writeString := func(s string) error {
-		if err := binary.Write(buf, binary.BigEndian, uint16(len(s))); err != nil {
+		if err := binary.Write(buf, binary.BigEndian, uint8(len(s))); err != nil {
 			return err
 		}
 		if _, err := buf.Write([]byte(s)); err != nil {
@@ -43,8 +45,8 @@ func serializar_msg(c *ClientBet, clientId string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func sendMsg(conn net.Conn, c *ClientBet, clientId string) error {
-	data, err := serializar_msg(c, clientId)
+func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
+	data, err := serializeBet(c, clientId)
 
 	if err != nil {
 		return err
@@ -58,6 +60,20 @@ func sendMsg(conn net.Conn, c *ClientBet, clientId string) error {
 			return err
 		}
 		total += n
+	}
+	return nil
+}
+
+func sendBatch(conn net.Conn, batch []ClientBet, clientID string) error {
+	// First, send a message with the batch length, then start sending the bets
+	if err := binary.Write(conn, binary.BigEndian, uint16(len(batch))); err != nil {
+		return err
+	}
+
+	for _, bet := range batch {
+		if err := sendBet(conn, &bet, clientID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -112,4 +128,20 @@ func receiveConfirmationMsg(conn net.Conn) (*ClientBet, error) {
 	}
 
 	return bet, nil
+}
+
+func sizeBytes(clientBet *ClientBet) int {
+	fields := []string{
+		clientBet.Nombre,
+		clientBet.Apellido,
+		clientBet.Documento,
+		clientBet.Nacimiento,
+		clientBet.Numero,
+	}
+
+	size := 0
+	for _, f := range fields {
+		size += stringLenOverhead + len([]byte(f))
+	}
+	return size
 }
