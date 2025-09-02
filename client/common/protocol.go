@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -19,51 +18,18 @@ const (
 	OpcodeWinners        = 0x07
 )
 
-func serializeBet(c *ClientBet, clientId string) ([]byte, error) {
-	buf := new(bytes.Buffer)
-
-	// Helper for strings
-	writeString := func(s string) error {
-		if err := binary.Write(buf, binary.BigEndian, uint8(len(s))); err != nil {
-			return err
-		}
-		if _, err := buf.Write([]byte(s)); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if err := writeString(clientId); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Nombre); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Apellido); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Documento); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Nacimiento); err != nil {
-		return nil, err
-	}
-	if err := writeString(c.Numero); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
+func sendOpcode(conn net.Conn, opcode uint8) error {
+	return binary.Write(conn, binary.BigEndian, opcode)
 }
 
-func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
-	data, err := serializeBet(c, clientId)
-
-	if err != nil {
+func sendString(conn net.Conn, s string) error {
+	if err := binary.Write(conn, binary.BigEndian, uint8(len(s))); err != nil {
 		return err
 	}
 
 	// To avoid short-write and ensure the entire message is sent
 	total := 0
+	data := []byte(s)
 	for total < len(data) {
 		n, err := conn.Write(data[total:])
 		if err != nil {
@@ -74,9 +40,28 @@ func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
 	return nil
 }
 
+func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
+	fields := []string{
+		clientId,
+		c.Nombre,
+		c.Apellido,
+		c.Documento,
+		c.Nacimiento,
+		c.Numero,
+	}
+
+	for _, field := range fields {
+		if err := sendString(conn, field); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func sendBatch(conn net.Conn, batch []ClientBet, clientID string) error {
 	// First opcode, then send a message with the batch length, then start sending the bets
-	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeBatchBets)); err != nil {
+	if err := sendOpcode(conn, OpcodeBatchBets); err != nil {
 		return err
 	}
 
@@ -140,35 +125,21 @@ func sizeBytes(clientBet *ClientBet) int {
 }
 
 func sendClientID(conn net.Conn, clientID string) error {
-	// Opcode
-	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeInitClient)); err != nil {
+	if err := sendOpcode(conn, OpcodeInitClient); err != nil {
 		return err
 	}
-	// Largo
-	if err := binary.Write(conn, binary.BigEndian, uint8(len(clientID))); err != nil {
-		return err
-	}
-	// Payload
-	if _, err := conn.Write([]byte(clientID)); err != nil {
-		return err
-	}
-	return nil
+
+	return sendString(conn, clientID)
 }
 
 func sendBetsSubmissionCompleted(conn net.Conn) error {
 	// Send a message de un byte con 0x04 indicating that all bets have been sent
-	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeFinishedBets)); err != nil {
-		return err
-	}
-	return nil
+	return sendOpcode(conn, OpcodeFinishedBets)
 }
 
 func requestWinners(conn net.Conn) error {
 	// Send a message indicating that the client wants to consult the winners
-	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeRequestWinners)); err != nil {
-		return err
-	}
-	return nil
+	return sendOpcode(conn, OpcodeRequestWinners)
 }
 
 func receiveWinnersList(conn net.Conn) ([]string, error) {
