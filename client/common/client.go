@@ -25,8 +25,9 @@ type ClientConfig struct {
 
 // Client Entity that encapsulates how
 type Client struct {
-	config ClientConfig
-	conn   net.Conn
+	config   ClientConfig
+	conn     net.Conn
+	protocol Protocol
 }
 
 type ClientBet struct {
@@ -59,6 +60,7 @@ func (c *Client) createClientSocket() error {
 		)
 	}
 	c.conn = conn
+	c.protocol = Protocol{conn: conn}
 	return nil
 }
 
@@ -80,7 +82,7 @@ func (c *Client) StartClientLoop() {
 	reader := csv.NewReader(file)
 
 	c.createClientSocket()
-	sendClientID(c.conn, c.config.ID)
+	c.protocol.sendClientID(c.config.ID)
 	defer c.conn.Close()
 
 	for {
@@ -90,7 +92,7 @@ func (c *Client) StartClientLoop() {
 		}
 
 		// TODO: el protocolo puede ser un objeto y que tenga la info que le mandamos siempre en cada func
-		err = sendBatch(c.conn, batch, c.config.ID)
+		err = c.protocol.sendBatch(batch, c.config.ID)
 
 		if err != nil {
 			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
@@ -100,7 +102,7 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		confirmation, err := receiveBatchConfirmation(c.conn)
+		confirmation, err := c.protocol.receiveBatchConfirmation()
 
 		if err != nil {
 			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
@@ -110,7 +112,7 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		result := "fail"
+		result := "fail" // TODO: ??
 		if confirmation.Success {
 			result = "success"
 		}
@@ -123,7 +125,7 @@ func (c *Client) StartClientLoop() {
 		time.Sleep(c.config.LoopPeriod)
 	}
 
-	sendBetsSubmissionCompleted(c.conn)
+	c.protocol.sendBetsSubmissionCompleted()
 
 	c.conn.Close()
 
@@ -131,14 +133,14 @@ func (c *Client) StartClientLoop() {
 
 	for {
 		c.createClientSocket()
-		sendClientID(c.conn, c.config.ID)
+		c.protocol.sendClientID(c.config.ID)
 
 		// TODO: Consultar la lista de ganadores del sorteo de mi agencia : c.config.ID
-		requestWinners(c.conn) // envio el msg
+		c.protocol.requestWinners() // envio el msg
 
 		// si me llega un 0x06-WAIT voy a tener que cerrar la conexion y conectarme en un rato a preguntar denuevo
 
-		ganadores, err := readWinners(c.conn)
+		ganadores, err := c.protocol.readWinners()
 		if err != nil { // opcode incorrecto
 			log.Errorf("action: leer_ganadores | result: fail | client_id: %v | error: %v",
 				c.config.ID,
@@ -185,7 +187,7 @@ func (c *Client) createBatch(reader *csv.Reader) []ClientBet {
 			Numero:     record[4],
 		}
 
-		batchSize += sizeBytes(&clientBet)
+		batchSize += c.protocol.sizeBytes(&clientBet)
 
 		batch = append(batch, clientBet)
 

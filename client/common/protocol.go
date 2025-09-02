@@ -18,12 +18,16 @@ const (
 	OpcodeWinners        = 0x07
 )
 
-func sendOpcode(conn net.Conn, opcode uint8) error {
-	return binary.Write(conn, binary.BigEndian, opcode)
+type Protocol struct {
+	conn net.Conn
 }
 
-func sendString(conn net.Conn, s string) error {
-	if err := binary.Write(conn, binary.BigEndian, uint8(len(s))); err != nil {
+func (p *Protocol) sendOpcode(opcode uint8) error {
+	return binary.Write(p.conn, binary.BigEndian, opcode)
+}
+
+func (p *Protocol) sendString(s string) error {
+	if err := binary.Write(p.conn, binary.BigEndian, uint8(len(s))); err != nil {
 		return err
 	}
 
@@ -31,7 +35,7 @@ func sendString(conn net.Conn, s string) error {
 	total := 0
 	data := []byte(s)
 	for total < len(data) {
-		n, err := conn.Write(data[total:])
+		n, err := p.conn.Write(data[total:])
 		if err != nil {
 			return err
 		}
@@ -40,7 +44,7 @@ func sendString(conn net.Conn, s string) error {
 	return nil
 }
 
-func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
+func (p *Protocol) sendBet(c *ClientBet, clientId string) error {
 	fields := []string{
 		clientId,
 		c.Nombre,
@@ -51,7 +55,7 @@ func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
 	}
 
 	for _, field := range fields {
-		if err := sendString(conn, field); err != nil {
+		if err := p.sendString(field); err != nil {
 			return err
 		}
 	}
@@ -59,18 +63,18 @@ func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
 	return nil
 }
 
-func sendBatch(conn net.Conn, batch []ClientBet, clientID string) error {
+func (p *Protocol) sendBatch(batch []ClientBet, clientID string) error {
 	// First opcode, then send a message with the batch length, then start sending the bets
-	if err := sendOpcode(conn, OpcodeBatchBets); err != nil {
+	if err := p.sendOpcode(OpcodeBatchBets); err != nil {
 		return err
 	}
 
-	if err := binary.Write(conn, binary.BigEndian, uint16(len(batch))); err != nil {
+	if err := binary.Write(p.conn, binary.BigEndian, uint16(len(batch))); err != nil {
 		return err
 	}
 
 	for _, bet := range batch {
-		if err := sendBet(conn, &bet, clientID); err != nil {
+		if err := p.sendBet(&bet, clientID); err != nil {
 			return err
 		}
 	}
@@ -88,9 +92,9 @@ type BatchConfirmation struct {
 	Message string
 }
 
-func receiveBatchConfirmation(conn net.Conn) (*BatchConfirmation, error) {
+func (p *Protocol) receiveBatchConfirmation() (*BatchConfirmation, error) {
 	header := make([]byte, 3)
-	if _, err := io.ReadFull(conn, header); err != nil {
+	if _, err := io.ReadFull(p.conn, header); err != nil {
 		return nil, err
 	}
 
@@ -98,7 +102,7 @@ func receiveBatchConfirmation(conn net.Conn) (*BatchConfirmation, error) {
 	msgLen := binary.BigEndian.Uint16(header[1:3])
 
 	msgBytes := make([]byte, msgLen)
-	if _, err := io.ReadFull(conn, msgBytes); err != nil {
+	if _, err := io.ReadFull(p.conn, msgBytes); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +112,7 @@ func receiveBatchConfirmation(conn net.Conn) (*BatchConfirmation, error) {
 	}, nil
 }
 
-func sizeBytes(clientBet *ClientBet) int {
+func (p *Protocol) sizeBytes(clientBet *ClientBet) int {
 	fields := []string{
 		clientBet.Nombre,
 		clientBet.Apellido,
@@ -124,28 +128,28 @@ func sizeBytes(clientBet *ClientBet) int {
 	return size
 }
 
-func sendClientID(conn net.Conn, clientID string) error {
-	if err := sendOpcode(conn, OpcodeInitClient); err != nil {
+func (p *Protocol) sendClientID(clientID string) error {
+	if err := p.sendOpcode(OpcodeInitClient); err != nil {
 		return err
 	}
 
-	return sendString(conn, clientID)
+	return p.sendString(clientID)
 }
 
-func sendBetsSubmissionCompleted(conn net.Conn) error {
+func (p *Protocol) sendBetsSubmissionCompleted() error {
 	// Send a message de un byte con 0x04 indicating that all bets have been sent
-	return sendOpcode(conn, OpcodeFinishedBets)
+	return p.sendOpcode(OpcodeFinishedBets)
 }
 
-func requestWinners(conn net.Conn) error {
+func (p *Protocol) requestWinners() error {
 	// Send a message indicating that the client wants to consult the winners
-	return sendOpcode(conn, OpcodeRequestWinners)
+	return p.sendOpcode(OpcodeRequestWinners)
 }
 
-func receiveWinnersList(conn net.Conn) ([]string, error) {
+func (p *Protocol) receiveWinnersList() ([]string, error) {
 	// Read number of winners (2 bytes)
 	header := make([]byte, 2)
-	if _, err := io.ReadFull(conn, header); err != nil {
+	if _, err := io.ReadFull(p.conn, header); err != nil {
 		return nil, err
 	}
 	numWinners := binary.BigEndian.Uint16(header)
@@ -154,14 +158,14 @@ func receiveWinnersList(conn net.Conn) ([]string, error) {
 	for i := 0; i < int(numWinners); i++ {
 		// Read length of document (1 byte)
 		lenBuf := make([]byte, 1)
-		if _, err := io.ReadFull(conn, lenBuf); err != nil {
+		if _, err := io.ReadFull(p.conn, lenBuf); err != nil {
 			return nil, err
 		}
 		docLen := int(lenBuf[0])
 
 		// Read document (docLen bytes)
 		docBuf := make([]byte, docLen)
-		if _, err := io.ReadFull(conn, docBuf); err != nil {
+		if _, err := io.ReadFull(p.conn, docBuf); err != nil {
 			return nil, err
 		}
 		winners = append(winners, string(docBuf))
@@ -169,9 +173,9 @@ func receiveWinnersList(conn net.Conn) ([]string, error) {
 	return winners, nil
 }
 
-func readWinners(conn net.Conn) ([]string, error) {
+func (p *Protocol) readWinners() ([]string, error) {
 	opcode := make([]byte, 1)
-	if _, err := io.ReadFull(conn, opcode); err != nil {
+	if _, err := io.ReadFull(p.conn, opcode); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +185,7 @@ func readWinners(conn net.Conn) ([]string, error) {
 		return nil, nil
 	case OpcodeWinners:
 		// El servidor envía la lista de ganadores
-		return receiveWinnersList(conn)
+		return p.receiveWinnersList()
 	default:
 		return nil, fmt.Errorf("unexpected opcode: %v", opcode[0])
 	}
