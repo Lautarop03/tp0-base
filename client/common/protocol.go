@@ -3,11 +3,21 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 )
 
-const stringLenOverhead = 1 // Overhead for string length prefix
+const (
+	stringLenOverhead = 1 // Overhead for string length prefix
+
+	OpcodeInitClient     = 0x01
+	OpcodeBatchBets      = 0x02
+	OpcodeFinishedBets   = 0x04
+	OpcodeRequestWinners = 0x05
+	OpcodeWait           = 0x06
+	OpcodeWinners        = 0x07
+)
 
 func serializeBet(c *ClientBet, clientId string) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -65,7 +75,11 @@ func sendBet(conn net.Conn, c *ClientBet, clientId string) error {
 }
 
 func sendBatch(conn net.Conn, batch []ClientBet, clientID string) error {
-	// First, send a message with the batch length, then start sending the bets
+	// First opcode, then send a message with the batch length, then start sending the bets
+	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeBatchBets)); err != nil {
+		return err
+	}
+
 	if err := binary.Write(conn, binary.BigEndian, uint16(len(batch))); err != nil {
 		return err
 	}
@@ -123,4 +137,81 @@ func sizeBytes(clientBet *ClientBet) int {
 		size += stringLenOverhead + len([]byte(f))
 	}
 	return size
+}
+
+func sendClientID(conn net.Conn, clientID string) error {
+	// Opcode
+	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeInitClient)); err != nil {
+		return err
+	}
+	// Largo
+	if err := binary.Write(conn, binary.BigEndian, uint8(len(clientID))); err != nil {
+		return err
+	}
+	// Payload
+	if _, err := conn.Write([]byte(clientID)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendBetsSubmissionCompleted(conn net.Conn) error {
+	// Send a message de un byte con 0x04 indicating that all bets have been sent
+	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeFinishedBets)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func requestWinners(conn net.Conn) error {
+	// Send a message indicating that the client wants to consult the winners
+	if err := binary.Write(conn, binary.BigEndian, uint8(OpcodeRequestWinners)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func receiveWinnersList(conn net.Conn) ([]string, error) {
+	// Read number of winners (2 bytes)
+	header := make([]byte, 2)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return nil, err
+	}
+	numWinners := binary.BigEndian.Uint16(header)
+
+	winners := make([]string, 0, numWinners)
+	for i := 0; i < int(numWinners); i++ {
+		// Read length of document (1 byte)
+		lenBuf := make([]byte, 1)
+		if _, err := io.ReadFull(conn, lenBuf); err != nil {
+			return nil, err
+		}
+		docLen := int(lenBuf[0])
+
+		// Read document (docLen bytes)
+		docBuf := make([]byte, docLen)
+		if _, err := io.ReadFull(conn, docBuf); err != nil {
+			return nil, err
+		}
+		winners = append(winners, string(docBuf))
+	}
+	return winners, nil
+}
+
+func readWinners(conn net.Conn) ([]string, error) {
+	opcode := make([]byte, 1)
+	if _, err := io.ReadFull(conn, opcode); err != nil {
+		return nil, err
+	}
+
+	switch opcode[0] {
+	case OpcodeWait:
+		// El servidor indica que todavia no hay ganadores
+		return nil, nil
+	case OpcodeWinners:
+		// El servidor envía la lista de ganadores
+		return receiveWinnersList(conn)
+	default:
+		return nil, fmt.Errorf("unexpected opcode: %v", opcode[0])
+	}
 }

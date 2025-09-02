@@ -80,6 +80,7 @@ func (c *Client) StartClientLoop() {
 	reader := csv.NewReader(file)
 
 	c.createClientSocket()
+	sendClientID(c.conn, c.config.ID)
 	defer c.conn.Close()
 
 	for {
@@ -88,6 +89,7 @@ func (c *Client) StartClientLoop() {
 			break
 		}
 
+		// TODO: el protocolo puede ser un objeto y que tenga la info que le mandamos siempre en cada func
 		err = sendBatch(c.conn, batch, c.config.ID)
 
 		if err != nil {
@@ -121,7 +123,40 @@ func (c *Client) StartClientLoop() {
 		time.Sleep(c.config.LoopPeriod)
 	}
 
+	sendBetsSubmissionCompleted(c.conn)
+
+	c.conn.Close()
+
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+
+	for {
+		c.createClientSocket()
+
+		// TODO: Consultar la lista de ganadores del sorteo de mi agencia : c.config.ID
+		requestWinners(c.conn) // envio el msg
+
+		// si me llega un 0x06-WAIT voy a tener que cerrar la conexion y conectarme en un rato a preguntar denuevo
+
+		ganadores, err := readWinners(c.conn)
+		if err != nil { // opcode incorrecto
+			log.Errorf("action: leer_ganadores | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		// TODO: no me gusta el chequeo este de ganadores=nil
+		if ganadores == nil { // 0x06 WAIT
+			// esperar y consultar despues, pero tengo que reconectarme
+			c.conn.Close()
+			time.Sleep(3 * time.Second) // TODO; esta bien usar sleep?
+			continue
+		} else { // 0x07 GANADORES
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(ganadores))
+			return
+		}
+	}
 }
 
 func (c *Client) createBatch(reader *csv.Reader) []ClientBet {
