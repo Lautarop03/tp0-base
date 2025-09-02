@@ -44,46 +44,20 @@ class Server:
                 opcode = self.protocol.read_opcode()
 
                 if opcode == OPCODE_INIT_CLIENT:
-                    client_id = self.protocol.receive_client_id()   
+                    client_id = self.__handle_init_client() 
 
-                if opcode == OPCODE_BATCH_BETS:
-
-                    bets = self.protocol.read_batch_msg()
-
-                    if bets is None:
-                        break
-
-                    if len(bets) == 0:
-                        logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
-                        self.protocol.send_batch_confirmation(False, "No se recibieron apuestas")
-                        break
-
-                    store_bets(bets)
-                    logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
-                    self.protocol.send_batch_confirmation(True, "Apuestas recibidas correctamente") # TODO: cambiar por un opcode
+                elif opcode == OPCODE_BATCH_BETS:
+                    if not self.__handle_batch_msg():
+                        return
                 
                 elif opcode == OPCODE_FINISHED_BETS: 
-                    self._agency_ready[client_id-1] = True
+                    self.__handle_finished_bets(client_id)
                     return
 
                 elif opcode == OPCODE_REQUEST_WINNERS:
-
-                    if all(self._agency_ready):
-                        # Todas las agencias estan listas
-                        bets = load_bets()
-                        ganadores = []
-
-                        for bet in bets:
-                            if bet.agency == client_id and has_won(bet):
-                                ganadores.append(bet.document)
-
-                        self.protocol.send_winners(ganadores)
-                    else:
-                        # Las agencias todavia no estan listas
-                        self.protocol.send_wait()
-
+                    self.__handle_request_winners(client_id)
                     return
-
+                    
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
         finally:
@@ -110,3 +84,42 @@ class Server:
         logging.info("action: stop | result: success | detail: server socket was closed")
         self._client_socket.close()
         logging.info(f"action: stop | result: success | detail: client socket was closed")
+
+
+    # ------ Handlers for each opcode ------ #
+
+    def __handle_batch_msg(self) -> bool:
+        """Handle receiving and storing a batch of bets. Returns False if should stop loop."""
+        bets = self.protocol.read_batch_msg()
+
+        if bets is None or len(bets) == 0:
+            logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
+            self.protocol.send_batch_confirmation(False, "No se recibieron apuestas")
+            return False
+
+        store_bets(bets)
+        logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
+        self.protocol.send_batch_confirmation(True, "Apuestas recibidas correctamente")  # TODO: cambiar por un opcode
+        return True
+
+
+    def __handle_request_winners(self, client_id: int) -> None:
+        if all(self._agency_ready):
+            # Todas las agencias estan listas
+            bets = load_bets()
+            ganadores = []
+            for bet in bets:
+                if bet.agency == client_id and has_won(bet):
+                    ganadores.append(bet.document)
+            self.protocol.send_winners(ganadores)
+        else:
+            # Las agencias todavia no estan listas
+            self.protocol.send_wait()
+
+
+    def __handle_init_client(self) -> int:
+        return self.protocol.receive_client_id()  
+    
+
+    def __handle_finished_bets(self, client_id: int) -> None:
+        self._agency_ready[client_id-1] = True
