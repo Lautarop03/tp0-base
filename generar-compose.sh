@@ -17,6 +17,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENTS_NUMBER=$2
     volumes:
       - ./server/config.ini:/config.ini
     networks:
