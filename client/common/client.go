@@ -131,6 +131,7 @@ func (c *Client) StartClientLoop() {
 
 	for {
 		c.createClientSocket()
+		sendClientID(c.conn, c.config.ID)
 
 		// TODO: Consultar la lista de ganadores del sorteo de mi agencia : c.config.ID
 		requestWinners(c.conn) // envio el msg

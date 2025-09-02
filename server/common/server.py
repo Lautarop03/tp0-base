@@ -72,7 +72,7 @@ class Server:
                         ganadores = []
 
                         for bet in bets:
-                            if has_won(bet): # and bet.agency == client_id: #TODO: ver si le corresponde segun la agencia
+                            if bet.agency == client_id and has_won(bet):
                                 ganadores.append(bet.document)
 
                         send_winners(client_sock, ganadores)
