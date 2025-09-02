@@ -1,7 +1,7 @@
 import socket
 import logging
 from .utils import store_bets, load_bets, has_won
-from .protocol import read_batch_msg, send_batch_confirmation, read_opcode, send_wait, send_winners, receive_client_id
+from .protocol import Protocol
 from .protocol import (OPCODE_INIT_CLIENT, OPCODE_BATCH_BETS, OPCODE_FINISHED_BETS, OPCODE_REQUEST_WINNERS)
 
 class Server:
@@ -13,7 +13,7 @@ class Server:
         self._client_socket = None
         self._clients_number = clients_number
         self._agency_ready = [False] * clients_number
-
+        self.protocol = Protocol(self._client_socket)
 
     def run(self):
         """
@@ -38,27 +38,29 @@ class Server:
         client socket will also be closed.
         """
         try:
+            self.protocol.socket = client_sock
+
             while True:
-                opcode = read_opcode(client_sock)
+                opcode = self.protocol.read_opcode()
 
                 if opcode == OPCODE_INIT_CLIENT:
-                    client_id = receive_client_id(client_sock)   
+                    client_id = self.protocol.receive_client_id()   
 
                 if opcode == OPCODE_BATCH_BETS:
 
-                    bets = read_batch_msg(client_sock)
+                    bets = self.protocol.read_batch_msg()
 
                     if bets is None:
                         break
 
                     if len(bets) == 0:
                         logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
-                        send_batch_confirmation(client_sock, False, "No se recibieron apuestas")
+                        self.protocol.send_batch_confirmation(False, "No se recibieron apuestas")
                         break
 
                     store_bets(bets)
                     logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
-                    send_batch_confirmation(client_sock, True, "Apuestas recibidas correctamente") # TODO: cambiar por un opcode
+                    self.protocol.send_batch_confirmation(True, "Apuestas recibidas correctamente") # TODO: cambiar por un opcode
                 
                 elif opcode == OPCODE_FINISHED_BETS: 
                     self._agency_ready[client_id-1] = True
@@ -75,10 +77,10 @@ class Server:
                             if bet.agency == client_id and has_won(bet):
                                 ganadores.append(bet.document)
 
-                        send_winners(client_sock, ganadores)
+                        self.protocol.send_winners(ganadores)
                     else:
                         # Las agencias todavia no estan listas
-                        send_wait(client_sock)
+                        self.protocol.send_wait()
 
                     return
 
