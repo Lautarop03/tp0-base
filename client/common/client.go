@@ -91,6 +91,9 @@ func (c *Client) StartClientLoop() {
 	c.conn.Close()
 }
 
+// runBatchesLoop handles the main loop for sending batches of bets to the server.
+// It creates a client socket, sends the client ID, and continuously reads and sends batches
+// of bets until there are no more bets to send or an error occurs.
 func (c *Client) runBatchesLoop(reader *csv.Reader) {
 	c.createClientSocket()
 	c.protocol.sendClientID(c.config.ID)
@@ -109,6 +112,8 @@ func (c *Client) runBatchesLoop(reader *csv.Reader) {
 	}
 }
 
+// sendBatch sends a batch of bets to the server and waits for a confirmation response.
+// It returns true if the batch was sent and confirmed successfully, otherwise false.
 func (c *Client) sendBatch(batch []ClientBet) bool {
 	err := c.protocol.sendBatch(batch, c.config.ID)
 	if err != nil {
