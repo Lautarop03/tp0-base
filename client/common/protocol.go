@@ -173,20 +173,29 @@ func (p *Protocol) receiveWinnersList() ([]string, error) {
 	return winners, nil
 }
 
-func (p *Protocol) readWinners() ([]string, error) {
+type WinnersResult struct {
+	Winners []string
+	Waiting bool // true si el servidor responde con OpcodeWait
+}
+
+func (p *Protocol) readWinners() (WinnersResult, error) {
 	opcode := make([]byte, 1)
 	if _, err := io.ReadFull(p.conn, opcode); err != nil {
-		return nil, err
+		return WinnersResult{}, err
 	}
 
 	switch opcode[0] {
 	case OpcodeWait:
 		// El servidor indica que todavia no hay ganadores
-		return nil, nil
+		return WinnersResult{Waiting: true}, nil
 	case OpcodeWinners:
 		// El servidor envía la lista de ganadores
-		return p.receiveWinnersList()
+		winners, err := p.receiveWinnersList()
+		if err != nil {
+			return WinnersResult{}, err
+		}
+		return WinnersResult{Winners: winners, Waiting: false}, nil
 	default:
-		return nil, fmt.Errorf("unexpected opcode: %v", opcode[0])
+		return WinnersResult{}, fmt.Errorf("unexpected opcode: %v", opcode[0])
 	}
 }

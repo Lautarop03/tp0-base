@@ -151,7 +151,7 @@ func (c *Client) runWinnersLoop() {
 
 		c.protocol.requestWinners()
 
-		ganadores, err := c.protocol.readWinners()
+		res, err := c.protocol.readWinners()
 		if err != nil {
 			log.Errorf("action: leer_ganadores | result: fail | client_id: %v | error: %v",
 				c.config.ID,
@@ -160,14 +160,13 @@ func (c *Client) runWinnersLoop() {
 			return
 		}
 
-		if ganadores == nil { // 0x06 WAIT
+		if res.Waiting {
 			c.conn.Close()
-			time.Sleep(3 * time.Second) // TODO; esta bien usar sleep?
+			time.Sleep(3 * time.Second) // Esperar antes de volver a consultar
 			continue
 		}
 
-		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(ganadores))
-
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(res.Winners))
 		return
 	}
 }
