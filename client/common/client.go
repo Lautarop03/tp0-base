@@ -81,9 +81,19 @@ func (c *Client) StartClientLoop() {
 
 	reader := csv.NewReader(file)
 
+	c.runBatchesLoop(reader)
+	c.protocol.sendBetsSubmissionCompleted()
+
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+
+	c.runWinnersLoop()
+
+	c.conn.Close()
+}
+
+func (c *Client) runBatchesLoop(reader *csv.Reader) {
 	c.createClientSocket()
 	c.protocol.sendClientID(c.config.ID)
-	defer c.conn.Close()
 
 	for {
 		batch := c.createBatch(reader)
@@ -91,57 +101,53 @@ func (c *Client) StartClientLoop() {
 			break
 		}
 
-		// TODO: el protocolo puede ser un objeto y que tenga la info que le mandamos siempre en cada func
-		err = c.protocol.sendBatch(batch, c.config.ID)
-
-		if err != nil {
-			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
+		if !c.sendBatch(batch) {
 			return
 		}
 
-		confirmation, err := c.protocol.receiveBatchConfirmation()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		result := "fail" // TODO: ??
-		if confirmation.Success {
-			result = "success"
-		}
-		log.Infof("action: apuesta_enviada | result: %s | message: %v",
-			result,
-			confirmation.Message,
-		)
-
-		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 	}
+}
 
-	c.protocol.sendBetsSubmissionCompleted()
+func (c *Client) sendBatch(batch []ClientBet) bool {
+	err := c.protocol.sendBatch(batch, c.config.ID)
+	if err != nil {
+		log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return false
+	}
 
-	c.conn.Close()
+	confirmation, err := c.protocol.receiveBatchConfirmation()
+	if err != nil {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return false
+	}
 
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	result := "fail"
+	if confirmation.Success {
+		result = "success"
+	}
+	log.Infof("action: apuesta_enviada | result: %s | message: %v",
+		result,
+		confirmation.Message,
+	)
+	return true
+}
 
+func (c *Client) runWinnersLoop() {
 	for {
 		c.createClientSocket()
 		c.protocol.sendClientID(c.config.ID)
 
-		// TODO: Consultar la lista de ganadores del sorteo de mi agencia : c.config.ID
-		c.protocol.requestWinners() // envio el msg
-
-		// si me llega un 0x06-WAIT voy a tener que cerrar la conexion y conectarme en un rato a preguntar denuevo
+		c.protocol.requestWinners()
 
 		ganadores, err := c.protocol.readWinners()
-		if err != nil { // opcode incorrecto
+		if err != nil {
 			log.Errorf("action: leer_ganadores | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
@@ -149,16 +155,15 @@ func (c *Client) StartClientLoop() {
 			return
 		}
 
-		// TODO: no me gusta el chequeo este de ganadores=nil
 		if ganadores == nil { // 0x06 WAIT
-			// esperar y consultar despues, pero tengo que reconectarme
 			c.conn.Close()
 			time.Sleep(3 * time.Second) // TODO; esta bien usar sleep?
 			continue
-		} else { // 0x07 GANADORES
-			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(ganadores))
-			return
 		}
+
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(ganadores))
+
+		return
 	}
 }
 
