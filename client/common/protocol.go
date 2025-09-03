@@ -84,32 +84,24 @@ func (p *Protocol) sendBatch(batch []ClientBet, clientID string) error {
 // receiveBatchConfirmation receives the batch confirmation from the server.
 // Format:
 //
+//	1 byte opcode (0x03)
 //	1 byte: success (0 = fail, 1 = success)
-//	2 bytes: message length (uint16 big-endian)
-//	N bytes: message (utf-8)
-type BatchConfirmation struct {
-	Success bool
-	Message string
-}
 
-func (p *Protocol) receiveBatchConfirmation() (*BatchConfirmation, error) {
-	header := make([]byte, 3)
-	if _, err := io.ReadFull(p.conn, header); err != nil {
-		return nil, err
+func (p *Protocol) receiveBatchConfirmation() (bool, error) {
+	opcode := make([]byte, 1)
+	if _, err := io.ReadFull(p.conn, opcode); err != nil {
+		return false, err
+	}
+	if opcode[0] != 0x03 {
+		return false, fmt.Errorf("unexpected opcode: %v", opcode[0])
 	}
 
-	success := header[0] == 1
-	msgLen := binary.BigEndian.Uint16(header[1:3])
-
-	msgBytes := make([]byte, msgLen)
-	if _, err := io.ReadFull(p.conn, msgBytes); err != nil {
-		return nil, err
+	success := make([]byte, 1)
+	if _, err := io.ReadFull(p.conn, success); err != nil {
+		return false, err
 	}
 
-	return &BatchConfirmation{
-		Success: success,
-		Message: string(msgBytes),
-	}, nil
+	return success[0] == 1, nil
 }
 
 func (p *Protocol) sizeBytes(clientBet *ClientBet) int {

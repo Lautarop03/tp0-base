@@ -125,22 +125,15 @@ func (c *Client) sendBatch(batch []ClientBet) bool {
 	}
 
 	confirmation, err := c.protocol.receiveBatchConfirmation()
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+	if err != nil || !confirmation {
+		log.Errorf("action: receive_message_confirmation | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)
 		return false
 	}
 
-	result := "fail"
-	if confirmation.Success {
-		result = "success"
-	}
-	log.Infof("action: apuesta_enviada | result: %s | message: %v",
-		result,
-		confirmation.Message,
-	)
+	log.Infof("action: batch_apuesta_enviado | result: success")
 	return true
 }
 

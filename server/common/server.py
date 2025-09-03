@@ -94,12 +94,12 @@ class Server:
 
         if bets is None or len(bets) == 0:
             logging.warning("action: apuesta_recibida | result: fail | cantidad: 0")
-            self.protocol.send_batch_confirmation(False, "No se recibieron apuestas")
+            self.protocol.send_batch_confirmation(False)
             return False
 
         store_bets(bets)
         logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-        self.protocol.send_batch_confirmation(True, "Apuestas recibidas correctamente")  # TODO: cambiar por un opcode
+        self.protocol.send_batch_confirmation(True)
         return True
 
 

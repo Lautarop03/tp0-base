@@ -4,6 +4,7 @@ from .utils import Bet
 
 OPCODE_INIT_CLIENT = 0x01
 OPCODE_BATCH_BETS = 0x02
+OPCODE_BATCH_CONFIRMATION = 0x03
 OPCODE_FINISHED_BETS = 0x04
 OPCODE_REQUEST_WINNERS = 0x05
 OPCODE_WAIT = 0x06
@@ -82,19 +83,16 @@ class Protocol:
         return bets
 
 
-    def send_batch_confirmation(self, success: bool, message: str = "") -> None:
+    def send_batch_confirmation(self, success: bool) -> None:
         """
-        Sends the batch confirmation to the client.
+        Sends the batch confirmation to the client without a message or length.
         Format:
-            1 byte: success (0 = fail, 1 = success)
-            2 bytes: message length (uint16 big-endian)
-            N bytes: message (utf-8)
+            1 byte: opcode = 0x03
+            1 byte: success (0 or 1)
         """
         buf = bytearray()
+        buf.append(OPCODE_BATCH_CONFIRMATION)
         buf.append(1 if success else 0)
-        encoded_msg = message.encode('utf-8')
-        buf.extend(self.write_uint16(len(encoded_msg)))
-        buf.extend(encoded_msg)
         self.socket.sendall(buf)
 
 
