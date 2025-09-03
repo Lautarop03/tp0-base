@@ -243,7 +243,7 @@ Esto permite al cliente verificar que todos los campos se recibieron correctamen
 
 #### Definicion del protocolo
 
-Cada mensaje se compone de varios campos de tipo string, correspondientes a una apuesta.
+Cada mensaje de apuesta se compone de varios campos de tipo string, correspondientes a una apuesta.
 
 Para cada campo se sigue el formato:
 
@@ -320,3 +320,33 @@ Luego, todas las apuestas se envian seguidas, sin delimitadores. El servidor sol
 - **Modificacion de diseño de protocolo**: 
 Se realizo una actualizacion en el protocolo con respecto a los tamaños de los indicadores de longitud de los strings.
 Ahora son `uint8`, en base a los csv recibidos me parece una buena opcion tener hasta un largo de 255 bytes. Esto tambien permite el envio de mayores apuestas dentro del batch.
+
+### Ej7
+- En los ejercicios anteriores el cliente enviaba mensaje de manera secuencial y el servidor esperaba estos mensajes. Para poder manejar distintos casos como se presentan en este ejercicio modifique nuevamente el protocolo de comunicacion. De esta manera no dependemos de un orden y podemos procesar los distintos mensajes que pueden llegar.
+Cada mensaje comienza con un byte de opcode, que indica el tipo de mensaje y como debe recibirse el resto de la informacion.
+
+| Opcode | Nombre | Estructura de datos | Descripcion  |
+|--------|--------|---------------------|--------------|
+| `0x01` | InitClient | `1 byte: length` + `N bytes clientID` | El cliente envia su ID hacia el servidor |
+| `0x02` | Batch Bets | `2 bytes: length` + `N Bets` | El cliente envia al server un batch de N bets (el protocolo de envio de bets se mantiene igual) |
+| `0x03` | Batch Confirmation | `1 byte: succes` | El server confirma el procesamiento del batch |
+| `0x04` | Finished bets | - | El cliente confirma al server que ya envio todas las Bets | 
+| `0x05` | Request Winners | - | El cliente solicita por los ganadores del sorteo | 
+| `0x06` | Wait | - | El servidor avisa al cliente que espere por el sorteo (todavia no se realizo) | 
+| `0x07` | Winners | `1 bytes: length` + `N Documents` | El servidor envia los datos de los ganadores hacia el cliente | 
+| - | Document | `1 byte: length` + `Document` | Protocolo de envio de documento dentro del mensaje con `opcode = 0x07` |
+
+- El servidor mantiene una lista con todas las agencias para verificar si ya terminaron de enviar sus apuestas. Una vez que un cliente finaliza el envío de su batch de apuestas, comienza a consultar al servidor por los ganadores.
+
+- La respuesta del servidor puede ser de dos tipos:
+
+    1. `opcode 0x06 (Wait)`: el servidor indica que el sorteo todavía no se realizó. En este caso, el cliente se desconecta temporalmente, permitiendo que el servidor continúe procesando otros mensajes. Pasado un tiempo (en nuestro caso, 3 segundos), el cliente vuelve a conectarse y consulta nuevamente.
+
+    2. `opcode 0x07 (Winners)`: el servidor envía la lista de DNI de los ganadores. El cliente recibe esta información y imprime la cantidad de ganadores obtenidos.
+
+- Correcciones en codigo:
+    Se refactorizaron las funciones de protocolo tanto en el cliente como en el servidor, modularizándolas para mejorar la organización del código.
+
+    Ahora el protocolo es un objeto que contiene el socket como atributo, evitando tener que pasarlo como parámetro en cada llamada.
+
+    Además, se elimino codigo repetido y se reorganizaron las funciones, logrando que sean mas legibles y faciles de extender en caso de futuras modificaciones.

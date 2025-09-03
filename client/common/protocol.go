@@ -10,12 +10,13 @@ import (
 const (
 	stringLenOverhead = 1 // Overhead for string length prefix
 
-	OpcodeInitClient     = 0x01
-	OpcodeBatchBets      = 0x02
-	OpcodeFinishedBets   = 0x04
-	OpcodeRequestWinners = 0x05
-	OpcodeWait           = 0x06
-	OpcodeWinners        = 0x07
+	OpcodeInitClient        = 0x01
+	OpcodeBatchBets         = 0x02
+	OpcodeBatchConfirmation = 0x03
+	OpcodeFinishedBets      = 0x04
+	OpcodeRequestWinners    = 0x05
+	OpcodeWait              = 0x06
+	OpcodeWinners           = 0x07
 )
 
 type Protocol struct {
@@ -84,7 +85,7 @@ func (p *Protocol) sendBatch(batch []ClientBet, clientID string) error {
 // receiveBatchConfirmation receives the batch confirmation from the server.
 // Format:
 //
-//	1 byte opcode (0x03)
+//	1 byte opcode (OpcodeBatchConfirmation = 0x03)
 //	1 byte: success (0 = fail, 1 = success)
 
 func (p *Protocol) receiveBatchConfirmation() (bool, error) {
@@ -92,7 +93,7 @@ func (p *Protocol) receiveBatchConfirmation() (bool, error) {
 	if _, err := io.ReadFull(p.conn, opcode); err != nil {
 		return false, err
 	}
-	if opcode[0] != 0x03 {
+	if opcode[0] != OpcodeBatchConfirmation {
 		return false, fmt.Errorf("unexpected opcode: %v", opcode[0])
 	}
 
