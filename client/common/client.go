@@ -139,8 +139,6 @@ func (c *Client) sendBatch(batch []ClientBet) bool {
 
 func (c *Client) runWinnersLoop() {
 	for {
-		// c.createClientSocket()
-		// c.protocol.sendClientID(c.config.ID)
 
 		c.protocol.requestWinners()
 
@@ -154,7 +152,6 @@ func (c *Client) runWinnersLoop() {
 		}
 
 		if res.Waiting {
-			// c.conn.Close()
 			time.Sleep(3 * time.Second) // Esperar antes de volver a consultar
 			continue
 		}
