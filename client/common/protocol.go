@@ -27,14 +27,8 @@ func (p *Protocol) sendOpcode(opcode uint8) error {
 	return binary.Write(p.conn, binary.BigEndian, opcode)
 }
 
-func (p *Protocol) sendString(s string) error {
-	if err := binary.Write(p.conn, binary.BigEndian, uint8(len(s))); err != nil {
-		return err
-	}
-
-	// To avoid short-write and ensure the entire message is sent
+func (p *Protocol) writeFull(data []byte) error {
 	total := 0
-	data := []byte(s)
 	for total < len(data) {
 		n, err := p.conn.Write(data[total:])
 		if err != nil {
@@ -43,6 +37,14 @@ func (p *Protocol) sendString(s string) error {
 		total += n
 	}
 	return nil
+}
+
+func (p *Protocol) sendString(s string) error {
+	if err := binary.Write(p.conn, binary.BigEndian, uint8(len(s))); err != nil {
+		return err
+	}
+
+	return p.writeFull([]byte(s))
 }
 
 func (p *Protocol) sendBet(c *ClientBet, clientId string) error {
@@ -70,7 +72,9 @@ func (p *Protocol) sendBatch(batch []ClientBet, clientID string) error {
 		return err
 	}
 
-	if err := binary.Write(p.conn, binary.BigEndian, uint16(len(batch))); err != nil {
+	batchLen := make([]byte, 2)
+	binary.BigEndian.PutUint16(batchLen, uint16(len(batch)))
+	if err := p.writeFull(batchLen); err != nil {
 		return err
 	}
 
