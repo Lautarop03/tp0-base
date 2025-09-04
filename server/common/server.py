@@ -16,6 +16,12 @@ class Server:
         self._clients_number = clients_number
         self._agency_ready = [False] * clients_number
 
+        # Lock to protect access to _agency_ready
+        self._lock_agency_ready = threading.Lock()
+
+        # Lock to protect access to storage from utils
+        self._lock_storage = threading.Lock()
+
     def run(self):
         """
         Dummy Server loop
@@ -101,16 +107,24 @@ class Server:
             protocol.send_batch_confirmation(False)
             return False
 
-        store_bets(bets)
+        with self._lock_storage:
+            store_bets(bets)
+
         logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
         protocol.send_batch_confirmation(True)
         return True
 
 
     def __handle_request_winners(self, protocol: Protocol, client_id: int) -> bool:
-        if all(self._agency_ready):
+        with self._lock_agency_ready:
+            ready = all(self._agency_ready)
+
+        if ready:
             # Todas las agencias estan listas
-            bets = load_bets()
+            
+            with self._lock_storage:
+                bets = load_bets()
+            
             ganadores = []
             for bet in bets:
                 if bet.agency == client_id and has_won(bet):
@@ -128,4 +142,5 @@ class Server:
     
 
     def __handle_finished_bets(self, client_id: int) -> None:
-        self._agency_ready[client_id-1] = True
+        with self._lock_agency_ready:
+            self._agency_ready[client_id-1] = True
