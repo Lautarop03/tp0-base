@@ -81,6 +81,9 @@ func (c *Client) StartClientLoop() {
 
 	reader := csv.NewReader(file)
 
+	c.createClientSocket()
+	c.protocol.sendClientID(c.config.ID)
+
 	c.runBatchesLoop(reader)
 	c.protocol.sendBetsSubmissionCompleted()
 
@@ -95,9 +98,6 @@ func (c *Client) StartClientLoop() {
 // It creates a client socket, sends the client ID, and continuously reads and sends batches
 // of bets until there are no more bets to send or an error occurs.
 func (c *Client) runBatchesLoop(reader *csv.Reader) {
-	c.createClientSocket()
-	c.protocol.sendClientID(c.config.ID)
-
 	for {
 		batch := c.createBatch(reader)
 		if len(batch) == 0 {
@@ -139,8 +139,8 @@ func (c *Client) sendBatch(batch []ClientBet) bool {
 
 func (c *Client) runWinnersLoop() {
 	for {
-		c.createClientSocket()
-		c.protocol.sendClientID(c.config.ID)
+		// c.createClientSocket()
+		// c.protocol.sendClientID(c.config.ID)
 
 		c.protocol.requestWinners()
 
@@ -154,7 +154,7 @@ func (c *Client) runWinnersLoop() {
 		}
 
 		if res.Waiting {
-			c.conn.Close()
+			// c.conn.Close()
 			time.Sleep(3 * time.Second) // Esperar antes de volver a consultar
 			continue
 		}
