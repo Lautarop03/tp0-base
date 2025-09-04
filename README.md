@@ -357,6 +357,8 @@ Se modifico el cliente, ahora este no se desconecta entre finalizacion de envio 
 
 Para modificar el servidor y que pueda procesar mensajes en paralelo, se lanza un thread por cada conexion nueva de un cliente. Este thread ejecuta una funcion `__handle_client_connection`, que procesa los mensajes del cliente.
 
+Aunque Python tiene el GIL (Global Interpreter Lock), que limita la ejecucion simultanea de codigo Python, el multithreading sigue siendo util aqui porque la mayoría de las operaciones del servidor son I/O-bound. Los threads pueden esperar bloqueos de I/O sin bloquear la ejecución de otros threads, permitiendo que el servidor maneje multiples clientes de manera concurrente. Por el contrario, el multithreading suele tener efecto negativo en tareas de alto uso de CPU (CPU-bound), lo que no es nuestro caso.
+
 Para mantener la consistencia de los datos y evitar problemas de concurrencia se utilizan `locks`:
 - `_lock_agency_ready`: Protege el acceso a la lista _agency_ready, que indica que agencias han finalizado el envio de sus apuestas.
 - `_lock_storage`: Protege el acceso a las funciones de lectura y escritura que persisten las apuestas en el almacenamiento, garantizando que estas operaciones sean seguras ante concurrencia.
