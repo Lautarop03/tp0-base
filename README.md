@@ -350,3 +350,13 @@ Cada mensaje comienza con un byte de opcode, que indica el tipo de mensaje y com
     Ahora el protocolo es un objeto que contiene el socket como atributo, evitando tener que pasarlo como parámetro en cada llamada.
 
     Además, se elimino codigo repetido y se reorganizaron las funciones, logrando que sean mas legibles y faciles de extender en caso de futuras modificaciones.
+
+### Ej8
+
+Se modifico el cliente, ahora este no se desconecta entre finalizacion de envio de batch y solicitar por los ganadores.
+
+Para modificar el servidor y que pueda procesar mensajes en paralelo, se lanza un thread por cada conexion nueva de un cliente. Este thread ejecuta una funcion `__handle_client_connection`, que procesa los mensajes del cliente.
+
+Para mantener la consistencia de los datos y evitar problemas de concurrencia se utilizan `locks`:
+- `_lock_agency_ready`: Protege el acceso a la lista _agency_ready, que indica que agencias han finalizado el envio de sus apuestas.
+- `_lock_storage`: Protege el acceso a las funciones de lectura y escritura que persisten las apuestas en el almacenamiento, garantizando que estas operaciones sean seguras ante concurrencia.
